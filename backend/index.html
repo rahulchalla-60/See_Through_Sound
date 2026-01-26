@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>See Through Sound</title>
+</head>
+<body>
+    <h2>See Through Sound – Control Panel</h2>
+
+    <button onclick="start()">Start Camera</button>
+    <button onclick="stop()">Stop Camera</button>
+
+    <p id="status"></p>
+
+    <script>
+        async function start() {
+            const res = await fetch("/start", { method: "POST" });
+            const data = await res.json();
+            document.getElementById("status").innerText = data.status;
+        }
+
+        async function stop() {
+            const res = await fetch("/stop", { method: "POST" });
+            const data = await res.json();
+            document.getElementById("status").innerText = data.status;
+        }
+    </script>
+</body>
+</html>

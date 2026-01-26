@@ -5,8 +5,12 @@ class CameraManager:
     def __init__(self):
         self.cap = cv2.VideoCapture(CAMERA_INDEX)
         cv2.namedWindow(WINDOW_NAME)
+        if not self.cap.isOpened():
+            print(f"Warning: Could not open camera {CAMERA_INDEX}")
     
     def read_frame(self):
+        if not self.cap.isOpened():
+            return False, None
         return self.cap.read()
     
     def show_frame(self, frame):
