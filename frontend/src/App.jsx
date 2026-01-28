@@ -1,21 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import './App.css'
 
 function App() {
   const [status, setStatus] = useState('not running')
   const [loading, setLoading] = useState(false)
 
-  const fetchStatus = async () => {
-    try {
-      const res = await fetch('http://127.0.0.1:8001/status')
-      const data = await res.json()
-      setStatus(data.status)
-    } catch {
-      setStatus('backend unreachable')
-    }
-  }
-
-  const handleStart = async () => {
+  const handleStart = useCallback(async () => {
     setLoading(true)
     try {
       const res = await fetch('http://127.0.0.1:8001/start', { method: 'POST' })
@@ -25,9 +15,9 @@ function App() {
       setStatus('backend unreachable')
     }
     setLoading(false)
-  }
+  }, [])
 
-  const handleStop = async () => {
+  const handleStop = useCallback(async () => {
     if (!confirm("Stop camera?")) return
     setLoading(true)
     try {
@@ -38,17 +28,29 @@ function App() {
       setStatus('backend unreachable')
     }
     setLoading(false)
-  }
+  }, [])
 
   useEffect(() => {
-    fetchStatus()
+    const initialFetch = async () => {
+      try {
+        const res = await fetch('http://127.0.0.1:8001/status')
+        const data = await res.json()
+        setStatus(data.status)
+      } catch {
+        setStatus('backend unreachable')
+      }
+    }
+    initialFetch()
+  }, []) // Empty dependency - runs only once on mount
+
+  useEffect(() => {
     const handleKey = (e) => {
       if (e.key === 's' && status !== 'started' && !loading) handleStart()
       if (e.key === 'x' && status === 'started' && !loading) handleStop()
     }
     window.addEventListener('keydown', handleKey)
     return () => window.removeEventListener('keydown', handleKey)
-  })
+  }, [status, loading, handleStart, handleStop])
 
   const isRunning = status === 'started' || status === 'already running'
 
