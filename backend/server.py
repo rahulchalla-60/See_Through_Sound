@@ -1,76 +1,68 @@
 from fastapi import FastAPI
 import subprocess
-import signal
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import RedirectResponse
-from fastapi.middleware.cors import CORSMiddleware
-import sys
+import os
 
 app = FastAPI()
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",   # Vite (your React app)
-        "http://localhost:3000",   # CRA (optional)
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Simple CORS without middleware
+@app.middleware("http")
+async def add_cors(request, call_next):
+    response = await call_next(request)
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = "*"
+    return response
 
 process = None
 
-# Serve static HTML
-app.mount("/static", StaticFiles(directory=".", html=True), name="static")
-
-@app.get("/")
-def root():
-    return RedirectResponse(url="/static/index.html")
+@app.get("/logs")
+def get_logs():
+    global process
+    if process:
+        try:
+            stdout, stderr = process.communicate(timeout=0.1)
+            return {"stdout": stdout, "stderr": stderr, "returncode": process.returncode}
+        except subprocess.TimeoutExpired:
+            return {"status": "process running", "returncode": None}
+        except:
+            return {"error": "could not get logs"}
+    return {"error": "no process"}
 
 @app.get("/status")
 def get_status():
     global process
-    if process is None:
-        return {"status": "not running"}
-    if process.poll() is not None:
-        process = None  # Reset if process died
-        return {"status": "not running"}
-    return {"status": "started"}
-
+    if process and process.poll() is None:
+        return {"status": "started"}
+    process = None
+    return {"status": "not running"}
 
 @app.post("/start")
-def start_backend():
+def start_camera():
     global process
-    if process is not None and process.poll() is None:
+    if process and process.poll() is None:
         return {"status": "already running"}
-    
     try:
+        import sys
+        print(f"Starting process with: {sys.executable}")
+        print(f"Working directory: {os.path.dirname(__file__)}")
         process = subprocess.Popen(
-            [sys.executable, "main.py"],
-            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP
+            [sys.executable, "main.py"], 
+            cwd=os.path.dirname(__file__),
+            creationflags=subprocess.CREATE_NEW_CONSOLE  # Create new console window
         )
         return {"status": "started"}
-    except Exception:
-        process = None
+    except Exception as e:
+        print(f"Error starting process: {e}")
         return {"status": "not running"}
-
 
 @app.post("/stop")
-def stop_backend():
+def stop_camera():
     global process
-    if process is None:
-        return {"status": "not running"}
-    
-    try:
-        if process.poll() is None:  # Process is still running
-            process.send_signal(signal.CTRL_BREAK_EVENT)
+    if process:
+        process.terminate()
         process = None
-        return {"status": "stopped"}
-    except Exception:
-        process = None
-        return {"status": "stopped"}
+    return {"status": "stopped"}
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="127.0.0.1", port=8001)
